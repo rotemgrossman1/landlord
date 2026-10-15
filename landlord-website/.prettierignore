@@ -1,0 +1,13 @@
+.next
+out
+node_modules
+playwright-report
+test-results
+package-lock.json
+next-env.d.ts
+
+# Owned by the product/design/change-manager agents; keep their formatting.
+docs
+specs
+.claude
+CLAUDE.md
