@@ -7,7 +7,8 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded PR runs only; every commit on main gets a complete run.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -24,24 +25,26 @@ jobs:
           cache: npm
           cache-dependency-path: landlord-website/package-lock.json
       - run: npm ci
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
       - run: npm run check:tbd
       - run: npm run build
-
-  e2e:
-    runs-on: ubuntu-latest
-    needs: checks
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Get Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
         with:
-          node-version-file: landlord-website/.nvmrc
-          cache: npm
-          cache-dependency-path: landlord-website/package-lock.json
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      # Reuses the build above (playwright.config.ts only starts the server when CI is set).
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
